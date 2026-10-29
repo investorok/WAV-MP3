@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>WAV у MP3</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;600&family=Unbounded:wght@700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.0/lame.min.js"></script>
+<style>
+:root{color-scheme:light;--bg:#eef1f5;--card:#fff;--ink:#17202e;--mute:#5b6678;--line:#d3d9e3;--plate:#e6eaf1;--acc:#c2255c;--on:#fff;--bad:#b3261e;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#111722;--card:#1a2230;--ink:#e8edf6;--mute:#97a3b8;--line:#2d3749;--plate:#232d3e;--acc:#ff7aa5;--on:#1b1020;--bad:#ff8a80}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#111722;--card:#1a2230;--ink:#e8edf6;--mute:#97a3b8;--line:#2d3749;--plate:#232d3e;--acc:#ff7aa5;--on:#1b1020;--bad:#ff8a80}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.55 "Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:44px 20px 72px}
+h1{font:700 clamp(44px,12vw,92px)/.95 Unbounded,"Golos Text",system-ui,sans-serif;letter-spacing:-.045em;margin:0 0 20px}
+.lead{color:var(--mute);max-width:56ch;margin:0 0 28px}
+.mute{color:var(--mute);font-size:14px}
+.drop{display:block;border:2px dashed var(--line);border-radius:18px;padding:48px 20px;text-align:center;cursor:pointer;background:var(--card);transition:border-color .15s}
+.drop:hover,.drop.over{border-color:var(--acc)}
+.drop b{display:block;font-size:19px;margin-bottom:6px}
+.drop span{color:var(--mute);font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;margin-top:16px}
+.file{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.file strong{word-break:break-all}
+.strip{display:flex;gap:12px;margin:20px 0 4px}
+.plate{flex:1;min-width:0;background:var(--plate);border-radius:14px;padding:16px 18px}
+.plate b{display:block;font:700 28px/1 Unbounded,"Golos Text",system-ui,sans-serif;letter-spacing:-.03em;margin-bottom:10px}
+.plate span{display:block;font-size:14px;color:var(--mute)}
+.plate.to{background:var(--acc);color:var(--on)}
+.plate.to span{color:inherit;opacity:.9}
+.arrow{width:40px;flex:none;align-self:center;color:var(--mute)}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:16px}
+.btn{font:inherit;font-weight:600;border:1px solid transparent;border-radius:12px;padding:12px 22px;background:var(--acc);color:var(--on);cursor:pointer}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.sec{background:transparent;color:var(--ink);border-color:var(--line);padding:9px 16px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.seg button{font:inherit;border:0;background:transparent;color:var(--ink);padding:9px 16px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--acc);color:var(--on);font-weight:600}
+button:focus-visible,input:focus-visible,.drop:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.prog{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:16px}
+.prog i{display:block;height:100%;width:0;background:var(--acc)}
+#msg{min-height:1.5em;margin:12px 0 0;color:var(--mute)}#msg.bad{color:var(--bad)}
+.done{margin:0 0 14px}.done strong{word-break:break-all}
+@media(max-width:480px){.arrow{width:26px}.plate{padding:14px}.plate b{font-size:22px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+<h1>WAV у MP3</h1>
+<p class="lead">Перетворює WAV на MP3 просто у браузері, навіть якщо файл стиснуто форматом IMA ADPCM, який не відкривають звичайні програми. Файл нікуди не надсилається.</p>
+
+<label class="drop" id="drop" tabindex="0"><input type="file" id="file" accept=".wav,.wave,audio/wav,audio/x-wav,audio/*" hidden><b>Перетягніть WAV-файл сюди або натисніть, щоб вибрати</b><span>PCM (8–32 біти), float та IMA ADPCM; інші формати — якщо їх відкриває браузер</span></label>
+<div class="prog" id="prog" hidden><i id="bar"></i></div>
+<p id="msg" role="status"></p>
+
+<section class="card" id="panel" hidden>
+  <div class="file"><strong id="fn"></strong><button class="btn sec" id="chg">Інший файл</button></div>
+  <div class="strip">
+    <div class="plate"><b>WAV</b><span id="src"></span></div>
+    <svg class="arrow" viewBox="0 0 48 16" aria-hidden="true"><path d="M0 8h44M37 1l8 7-8 7" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+    <div class="plate to"><b>MP3</b><span id="dst"></span></div>
+  </div>
+  <div class="row"><span class="mute" id="qlbl">Якість</span><div class="seg" role="group" aria-labelledby="qlbl"><button data-k="128" aria-pressed="false">128</button><button data-k="192" aria-pressed="true">192</button><button data-k="320" aria-pressed="false">320</button></div><span class="mute">кбіт/с</span></div>
+  <p class="mute" id="qhint" style="margin:10px 0 0" hidden></p>
+  <div class="row"><button class="btn" id="go">Конвертувати в MP3</button><button class="btn sec" id="pl">Прослухати оригінал</button></div>
+</section>
+
+<section class="card" id="res" hidden>
+  <p class="done"><strong id="rn"></strong> <span class="mute" id="rs"></span></p>
+  <button class="btn" id="dl">Завантажити MP3</button>
+  <p class="mute" id="hint"></p>
+</section>
+</main>
+
+<script>
+const $=s=>document.querySelector(s),yieldUI=()=>new Promise(r=>{const c=new MessageChannel();c.port1.onmessage=r;c.port2.postMessage(0)});
+const rates=[8000,11025,12000,16000,22050,24000,32000,44100,48000];
+const IT=[-1,-1,-1,-1,2,4,6,8,-1,-1,-1,-1,2,4,6,8],ST=[7,8,9,10,11,12,13,14,16,17,19,21,23,25,28,31,34,37,41,45,50,55,60,66,73,80,88,97,107,118,130,143,157,173,190,209,230,253,279,307,337,371,408,449,494,544,598,658,724,796,876,963,1060,1166,1282,1411,1552,1707,1878,2066,2272,2499,2749,3024,3327,3660,4026,4428,4871,5358,5894,6484,7132,7845,8630,9493,10442,11487,12635,13899,15289,16818,18500,20350,22385,24623,27086,29794,32767];
+/* Читач WAV: PCM 8–32 біти, float, IMA ADPCM. Файл читається шматками, тож великі файли не вичерпують пам’ять. */
+async function readWav(f,prog){
+  const rd=async(a,b)=>new DataView(await f.slice(a,b).arrayBuffer()),tg=(d,o)=>String.fromCharCode(d.getUint8(o),d.getUint8(o+1),d.getUint8(o+2),d.getUint8(o+3));
+  const bad=m=>Object.assign(new Error(m),{wav:1}),h=await rd(0,Math.min(12,f.size));
+  if(f.size<44||tg(h,0)!=='RIFF'||tg(h,8)!=='WAVE')throw new Error('це не WAV-файл');
+  let p=12,fm=null;
+  while(p+8<=f.size){
+    const c=await rd(p,p+8),id=tg(c,0);let sz=c.getUint32(4,true);
+    if(id==='fmt '){const d=await rd(p+8,p+8+Math.min(sz,40));fm={t:d.getUint16(0,true),n:d.getUint16(2,true),sr:d.getUint32(4,true),a:d.getUint16(12,true),b:d.getUint16(14,true)};if(fm.t===65534&&sz>=26)fm.t=d.getUint16(24,true)}
+    else if(id==='data'){
+      if(!fm)throw bad('пошкоджений WAV: немає опису формату');
+      const s0=p+8;if(!sz||sz===4294967295||s0+sz>f.size)sz=f.size-s0;
+      const {t,n,b}=fm,ima=t===17,flt=t===3;
+      if(!(n>=1&&n<=8&&fm.sr>0)||!((ima&&b===4&&fm.a>=4*n)||(t===1&&[8,16,24,32].includes(b))||(flt&&(b===32||b===64))))
+        throw bad('цей WAV закодовано кодеком, який не вдалося розпізнати (код '+t+', '+b+' біт)');
+      const by=b>>3,fs=ima?fm.a:by*n,spb=ima?((fm.a/n|0)-4)*2+1:1,units=Math.floor(sz/fs),fr=units*spb;
+      if(!fr)throw bad('у WAV немає аудіоданих');
+      const ch=[];for(let k=0;k<n;k++)ch.push(new Float32Array(fr));
+      const per=Math.max(1,Math.floor(4194304/fs));
+      for(let u0=0;u0<units;u0+=per){
+        const cnt=Math.min(per,units-u0),ab=await f.slice(s0+u0*fs,s0+(u0+cnt)*fs).arrayBuffer(),d=new DataView(ab),u=new Uint8Array(ab);
+        if(ima){
+          for(let j=0;j<cnt;j++){
+            const o=j*fs,base=(u0+j)*spb;
+            for(let k=0;k<n;k++){
+              const hd=o+4*k;let pr=(u[hd]|u[hd+1]<<8)<<16>>16,ix=Math.min(88,u[hd+2]),m=1;
+              ch[k][base]=pr/32768;
+              for(let g=0;m<spb;g++){
+                const q=o+4*n+(g*n+k)*4;
+                for(let w=0;w<4&&m<spb;w++){
+                  const bt=u[q+w];
+                  for(let hn=0;hn<2&&m<spb;hn++){
+                    const nib=hn?bt>>4:bt&15,s=ST[ix],df=((2*(nib&7)+1)*s)>>3;
+                    pr+=nib&8?-df:df;pr=pr>32767?32767:pr<-32768?-32768:pr;
+                    ix+=IT[nib];ix=ix<0?0:ix>88?88:ix;
+                    ch[k][base+m++]=pr/32768;
+                  }
+                }
+              }
+            }
+          }
+        }else{
+          for(let i=0,q=0;i<cnt;i++)for(let k=0;k<n;k++,q+=by)
+            ch[k][u0+i]=b===16?d.getInt16(q,true)/32768:b===24?(d.getUint8(q)|d.getUint8(q+1)<<8|d.getInt8(q+2)<<16)/8388608:b===8?(d.getUint8(q)-128)/128:b===64?d.getFloat64(q,true):flt?d.getFloat32(q,true):d.getInt32(q,true)/2147483648;
+        }
+        if(prog)prog(u0/units);await yieldUI();
+      }
+      const buf=new AudioBuffer({numberOfChannels:n,length:fr,sampleRate:fm.sr});ch.forEach((a,i)=>buf.copyToChannel(a,i));
+      return{buf,codec:ima?'IMA ADPCM':(flt?'PCM float, ':'PCM, ')+b+' біт'};
+    }
+    p+=8+sz+(sz&1);
+  }
+  throw bad('у WAV немає аудіоданих');
+}
+/* MP3 підтримує лише певні частоти дискретизації; інші переводимо в найближчу придатну */
+async function toRate(b){
+  const sr=b.sampleRate;if(rates.includes(sr))return b;
+  const T=sr>48000?(sr%44100===0?44100:48000):rates.find(r=>r>=sr),oc=new OfflineAudioContext(b.numberOfChannels,Math.ceil(b.length*T/sr),T),s=oc.createBufferSource();
+  s.buffer=b;s.connect(oc.destination);s.start();return oc.startRendering();
+}
+async function mp3(b,kbps,prog){
+  b=await toRate(b);
+  const n=Math.min(2,b.numberOfChannels),sr=b.sampleRate;kbps=Math.min(kbps,sr<32000?160:320);
+  const enc=new lamejs.Mp3Encoder(n,sr,kbps),parts=[];
+  const i16=a=>{const o=new Int16Array(a.length);for(let i=0;i<a.length;i++){const v=Math.max(-1,Math.min(1,a[i]));o[i]=v<0?v*32768:v*32767}return o};
+  const l=i16(b.getChannelData(0)),r=n>1?i16(b.getChannelData(1)):null;
+  for(let i=0,k=0;i<l.length;i+=1152,k++){
+    const p=n>1?enc.encodeBuffer(l.subarray(i,i+1152),r.subarray(i,i+1152)):enc.encodeBuffer(l.subarray(i,i+1152));
+    if(p.length)parts.push(p);
+    if(k%300===0){prog(i/l.length);await yieldUI()}
+  }
+  const e=enc.flush();if(e.length)parts.push(e);
+  return{data:new Uint8Array(await new Blob(parts).arrayBuffer()),kbps,sr};
+}
+/* ZIP без стиснення: єдиний дозволений спосіб віддати MP3 з опублікованої сторінки */
+function crc(u){let t=crc.t;if(!t){t=crc.t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}}
+  let r=-1;for(let i=0;i<u.length;i++)r=t[(r^u[i])&255]^(r>>>8);return(r^-1)>>>0}
+function zip(fn,u){
+  const nm=new TextEncoder().encode(fn),c=crc(u),d=new Date(),dt=((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate(),tm=(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1);
+  const lh=new DataView(new ArrayBuffer(30+nm.length));
+  lh.setUint32(0,0x04034b50,true);lh.setUint16(4,20,true);lh.setUint16(6,0x800,true);lh.setUint16(10,tm,true);lh.setUint16(12,dt,true);
+  lh.setUint32(14,c,true);lh.setUint32(18,u.length,true);lh.setUint32(22,u.length,true);lh.setUint16(26,nm.length,true);new Uint8Array(lh.buffer).set(nm,30);
+  const e=46+nm.length,cd=new DataView(new ArrayBuffer(e+22));
+  cd.setUint32(0,0x02014b50,true);cd.setUint16(4,20,true);cd.setUint16(6,20,true);cd.setUint16(8,0x800,true);cd.setUint16(12,tm,true);cd.setUint16(14,dt,true);
+  cd.setUint32(16,c,true);cd.setUint32(20,u.length,true);cd.setUint32(24,u.length,true);cd.setUint16(28,nm.length,true);new Uint8Array(cd.buffer).set(nm,46);
+  cd.setUint32(e,0x06054b50,true);cd.setUint16(e+8,1,true);cd.setUint16(e+10,1,true);cd.setUint32(e+12,e,true);cd.setUint32(e+16,30+nm.length+u.length,true);
+  return new Blob([lh,u,cd]);
+}
+
+
+/* ---------- Інтерфейс ---------- */
+const fmt=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0'),khz=r=>(r/1000).toLocaleString('uk',{maximumFractionDigits:2})+' кГц';
+const say=(t,bad)=>{const m=$('#msg');m.textContent=t;m.className=bad?'bad':''},bar=p=>{$('#bar').style.width=Math.round(p*100)+'%'};
+const busy=on=>{$('#prog').hidden=!on;if(on)bar(0)},chn=()=>Math.min(2,src.numberOfChannels)>1?'стерео':'моно';
+let src=null,name='',out=null,kb=192,ac=null,node=null,dlCap;
+const getDl=async()=>{if(dlCap===undefined){try{dlCap=(await window.claude?.use('downloads'))||null}catch(e){dlCap=null}}return dlCap};
+const effSr=()=>{const s=src.sampleRate;return rates.includes(s)?s:s>48000?(s%44100===0?44100:48000):rates.find(r=>r>=s)};
+const dst=()=>{const cap=effSr()<32000?160:320,h=$('#qhint');$('#dst').textContent=Math.min(kb,cap)+' кбіт/с, '+chn();h.hidden=cap>=320;h.textContent=cap<320?'Для частоти '+khz(effSr())+' MP3 обмежений '+cap+' кбіт/с, тому вищі значення звук не покращать. Для мови 128 і '+cap+' звучать однаково.':''};
+async function load(f){
+  if(!f)return;stopPlay();$('#res').hidden=true;$('#panel').hidden=true;out=null;busy(true);say('Читаю файл…');
+  let r;
+  try{
+    try{r=await readWav(f,bar)}
+    catch(e1){try{r={buf:await new OfflineAudioContext(2,1,44100).decodeAudioData(await f.arrayBuffer()),codec:'декодовано браузером'}}catch(e2){throw e1}}
+  }catch(e){busy(false);say('Не вдалося відкрити «'+f.name+'»: '+(e.message||e.name)+'.',true);return}
+  src=r.buf;name=f.name;busy(false);say('');
+  $('#fn').textContent=f.name;$('#src').textContent=r.codec+', '+khz(src.sampleRate)+', '+(src.numberOfChannels>1?'стерео':'моно')+', '+fmt(src.duration);
+  dst();$('#drop').hidden=true;$('#panel').hidden=false;
+}
+async function go(){
+  if(!window.lamejs){say('Кодувальник MP3 не завантажився: перевірте з’єднання з інтернетом і оновіть сторінку.',true);return}
+  stopPlay();$('#go').disabled=true;$('#res').hidden=true;busy(true);
+  try{
+    const r=await mp3(src,kb,p=>{bar(p);say('Кодую MP3… '+Math.round(p*100)+'%')});
+    out=r.data;say('');
+    $('#dst').textContent=r.kbps+' кбіт/с, '+khz(r.sr)+', '+chn();
+    $('#rn').textContent=(name.replace(/\.[^.]+$/,'')||'audio')+'.mp3';$('#rs').textContent=(out.length/1048576).toLocaleString('uk',{maximumFractionDigits:2})+' МБ';
+    $('#res').hidden=false;showHint();$('#res').scrollIntoView({block:'nearest'});
+  }catch(e){say('Не вдалося закодувати MP3: '+(e.message||e.name)+'.',true)}
+  busy(false);$('#go').disabled=false;
+}
+async function showHint(){
+  const d=await getDl(),inV=!!window.claude;$('#dl').hidden=!d&&inV;
+  $('#hint').textContent=d?'Збережеться як ZIP-архів із файлом MP3 усередині: цей перегляд дозволяє зберігати лише певні типи файлів. Після завантаження розпакуйте архів.':inV?'Збереження файлів недоступне в цьому перегляді. Відкрийте сторінку в claude.ai.':'';
+}
+async function save(){
+  const base=name.replace(/\.[^.]+$/,'')||'audio',d=await getDl();
+  try{
+    if(d)await d.save({filename:base+'.zip',data:zip(base+'.mp3',out)});
+    else{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([out],{type:'audio/mpeg'}));a.download=base+'.mp3';document.body.appendChild(a);a.click();a.remove()}
+  }catch(e){say(e&&e.code==='declined'?'':'Не вдалося зберегти файл ('+((e&&(e.code||e.message))||'помилка')+').',true)}
+}
+function stopPlay(){if(node){node.onended=null;try{node.stop()}catch(e){}node=null}$('#pl').textContent='Прослухати оригінал'}
+async function play(){
+  if(node){stopPlay();return}
+  ac=ac||new(window.AudioContext||window.webkitAudioContext)();await ac.resume();
+  node=ac.createBufferSource();node.buffer=src;node.connect(ac.destination);node.onended=stopPlay;node.start();$('#pl').textContent='Зупинити';
+}
+const dz=$('#drop'),fi=$('#file'),qs=[...document.querySelectorAll('.seg button')];
+fi.onchange=()=>load(fi.files[0]);
+dz.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fi.click()}};
+addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over')});
+addEventListener('dragleave',e=>{if(!e.relatedTarget)dz.classList.remove('over')});
+addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');load(e.dataTransfer.files[0])});
+qs.forEach(b=>b.onclick=()=>{kb=+b.dataset.k;qs.forEach(x=>x.setAttribute('aria-pressed',x===b));dst();$('#res').hidden=true});
+$('#chg').onclick=()=>{stopPlay();$('#panel').hidden=true;$('#res').hidden=true;dz.hidden=false;fi.value='';say('')};
+$('#go').onclick=go;$('#pl').onclick=play;$('#dl').onclick=save;
+</script>
+</body>
+</html>
